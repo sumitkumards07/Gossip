@@ -54,7 +54,8 @@ io.on('connection', (socket) => {
         activeUsers.set(socket.id, { persona, deviceId, timestamp: Date.now() });
     });
 
-    socket.on('create_room', async ({ name, latitude, longitude }) => {
+    socket.on('create_room', async ({ name, latitude, longitude }, callback) => {
+        console.log(`[SERVER] active create_room request: ${name}, ${latitude}, ${longitude}`);
         try {
             const roomId = uuidv4();
             const roomData = {
@@ -75,7 +76,11 @@ io.on('connection', (socket) => {
             }
             console.log(`Room created: ${name} at ${latitude}, ${longitude}`);
             socket.emit('room_created', roomData);
-        } catch (err) { console.error(err); }
+            if (callback) callback({ success: true, room: roomData });
+        } catch (err) {
+            console.error('Error creating room:', err);
+            if (callback) callback({ success: false, error: err.message });
+        }
     });
 
     socket.on('join_room', async (roomId) => {

@@ -65,8 +65,15 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom }) => {
             name,
             latitude: location.latitude,
             longitude: location.longitude
+        }, (response: any) => {
+            console.log('Create room response:', response);
+            if (response?.success) {
+                alert('Success! Server created room.');
+            } else {
+                alert('Server failed to create room: ' + response?.error);
+            }
         });
-        alert(`Request sent to create room: ${name}`);
+        alert(`Request sent to create room: ${name}. Waiting for server response...`);
     };
 
     return (
