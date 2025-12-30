@@ -12,21 +12,20 @@ console.log("SERVER STARTING...");
 console.log("OPENROUTER_API_KEY Status:", process.env.OPENROUTER_API_KEY ? "✅ FOUND" : "❌ MISSING (Check .env)");
 console.log("---------------------------------------------------");
 
-// OpenRouter AI Setup (OpenAI-compatible)
-const OpenAI = require('openai');
-let openai = null;
+// OpenRouter SDK Setup
+const { OpenRouter } = require('@openrouter/sdk');
+let openrouter = null;
 try {
     if (process.env.OPENROUTER_API_KEY) {
-        openai = new OpenAI({
-            baseURL: "https://openrouter.ai/api/v1",
+        openrouter = new OpenRouter({
             apiKey: process.env.OPENROUTER_API_KEY,
         });
-        console.log("✅ AI Client Initialized (OpenRouter)");
+        console.log("✅ OpenRouter Client Initialized");
     } else {
-        console.error("❌ AI Client Skipped (No Key)");
+        console.error("❌ OpenRouter Client Skipped (No Key)");
     }
 } catch (e) {
-    console.error("Failed to init AI client:", e);
+    console.error("Failed to init OpenRouter client:", e);
 }
 
 const app = express();
@@ -177,7 +176,7 @@ io.on('connection', (socket) => {
 
                 setTimeout(async () => {
                     try {
-                        if (!openai) throw new Error("OpenRouter client not initialized");
+                        if (!openrouter) throw new Error("OpenRouter client not initialized");
                         console.log("[BOT AI] Starting generation...");
                         // Get recent context (last 5 messages)
                         let recentMessages = [];
@@ -191,16 +190,15 @@ io.on('connection', (socket) => {
 
                         const historyText = recentMessages.map(m => `${m.persona}: ${m.text}`).join('\n');
 
-                        const completion = await openai.chat.completions.create({
-                            model: "meta-llama/llama-3.2-3b-instruct:free",
-                            max_tokens: 60,
+                        const response = await openrouter.chat.send({
+                            model: "tngtech/deepseek-r1t2-chimera:free",
                             messages: [
-                                { role: "system", content: `${selectedBot.prompt}\n\nYou are in a group chat. Recent history:\n${historyText}` },
-                                { role: "user", content: `Someone (${persona}) said: "${cleanText}". Reply naturally as ${selectedBot.name}. Keep it very short.` }
+                                { role: "user", content: `System: ${selectedBot.prompt}\n\nChat History:\n${historyText}\n\nUser (${persona}): "${cleanText}"\nReply as ${selectedBot.name}:` }
                             ]
                         });
+                        console.log("AI Response:", JSON.stringify(response));
 
-                        const botReplyText = completion.choices[0]?.message?.content?.trim();
+                        const botReplyText = response.choices?.[0]?.message?.content?.trim();
 
                         if (botReplyText) {
                             const botMessage = {
