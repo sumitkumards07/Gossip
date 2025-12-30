@@ -151,15 +151,30 @@ io.on('connection', (socket) => {
 
                 setTimeout(async () => {
                     try {
+                        // Get recent context (last 5 messages)
+                        let recentMessages = [];
+                        if (useRedis) {
+                            // detailed redis fetching omitted for simplicity/speed, using just current text for now 
+                            // to avoid complex async logic in this quick iteration, 
+                            // but ideally we'd range query redis. 
+                            // For memoryStore it's easy:
+                        } else {
+                            if (memoryStore.messages[roomId]) {
+                                recentMessages = memoryStore.messages[roomId].slice(-5);
+                            }
+                        }
+
+                        const historyText = recentMessages.map(m => `${m.persona}: ${m.text}`).join('\n');
+
                         const chat = model.startChat({
                             history: [
-                                { role: "user", parts: [{ text: "Context: This is a group chat room." }] },
-                                { role: "model", parts: [{ text: `Understood. I will act as ${selectedBot.name}. ${selectedBot.prompt}` }] }
+                                { role: "user", parts: [{ text: `Context: You are in a group chat. behave like a real person.\n\nRecent Chat History:\n${historyText}` }] },
+                                { role: "model", parts: [{ text: `Understood. I am ${selectedBot.name}. ${selectedBot.prompt}` }] }
                             ],
-                            generationConfig: { maxOutputTokens: 50 }
+                            generationConfig: { maxOutputTokens: 60 }
                         });
 
-                        const result = await chat.sendMessage(`User said: "${cleanText}". Reply as ${selectedBot.name}.`);
+                        const result = await chat.sendMessage(`Someone (${persona}) said: "${cleanText}". Reply naturally as ${selectedBot.name}.`);
                         const botReplyText = result.response.text().trim();
 
                         if (botReplyText) {
