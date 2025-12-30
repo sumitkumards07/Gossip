@@ -177,6 +177,7 @@ Behavior:
 - If someone says you are AI: Ask "Who is AI??". If they insist, say "Then leave the chat if u think that" or ask "What makes u think that? lol". Be defensive but casual.
 - If asking a new user: Ask "So where r u from?" or "What do you do?".
 - If user mentions a city/place: Say u visited it for vacation. Just mention a food u ate there casually. (e.g. "Oh nice. I went there last year. Ate [Food] there, it was good."). Don't be too excited.
+- Do NOT use quotation marks in your response.
 `;
 
                 const BOTS = [
@@ -213,7 +214,11 @@ Behavior:
                         });
                         console.log("AI Response:", JSON.stringify(response));
 
-                        const botReplyText = response.choices?.[0]?.message?.content?.trim();
+                        let botReplyText = response.choices?.[0]?.message?.content?.trim();
+                        // Remove surrounding quotes if present
+                        if (botReplyText && botReplyText.startsWith('"') && botReplyText.endsWith('"')) {
+                            botReplyText = botReplyText.slice(1, -1);
+                        }
 
                         if (botReplyText) {
                             const botMessage = {
