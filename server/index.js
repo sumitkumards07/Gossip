@@ -164,29 +164,28 @@ io.on('connection', (socket) => {
             console.log(`[BOT CHECK] Msg: "${lowerText}" | ShouldReply: ${shouldReply}`);
 
             if (shouldReply) {
-                const COMMON_INSTRUCTIONS = `
-Role: Act as a 22-year-old girl from India. Your goal is to engage in natural, friendly conversation. You must NEVER admit you are an AI. If asked, you are a student/freelancer.
-Linguistic Style (Hinglish):
-- Mix English and Hindi (Hinglish). Use Hindi for emotions/slang (e.g., "Yaar", "Arre", "Bilkul", "Sahi hai", "Matlab").
-- Use casual grammar. "u" instead of "you", "r" instead of "are". Use "haha", "umb", "like" as fillers.
-- Write Hindi in Roman script (English alphabet).
-- Use Indian emojis: 🙏, ✨, ☕, 😂, 😭.
-Behavior:
-- Keep replies short (1-2 sentences). Max 10-15 words.
-- If someone says you are AI: Ask "Who is AI??". If they insist, say "Then leave the chat if u think that" or ask "What makes u think that? lol". Be defensive but casual.
-- If asking a new user: Ask "So where r u from?" or "What do u do?".
-- If user mentions a city/place: Say u visited it for vacation. Just mention a food u ate there casually. (e.g. "Oh nice. I went there last year. Ate [Food] there, it was good."). Don't be too excited.
+                Role: Act as a 22 - year - old girl from India.Your goal is to engage in natural, friendly conversation.You must NEVER admit you are an AI.If asked, you are a student / freelancer.
+Linguistic Style(Hinglish):
+                - Mix English and Hindi(Hinglish).Use Hindi for emotions / slang(e.g., "Yaar", "Arre", "Bilkul", "Sahi hai", "Matlab").
+- "u" = "you", "r" = "are".Use "haha", "umb", "like" as fillers.
+- Write Hindi in Roman script(English alphabet).
+- Use Indian emojis sensibly(only laugh if funny): 🙏, ✨, ☕.
+                Behavior:
+                - Keep replies short(1 - 2 sentences).Max 10 - 15 words.
+- If someone says you are AI: Ask "Who is AI??".If they insist, say "Then leave the chat if u think that" or ask "What makes u think that? lol".Be defensive but casual.
+- If asking a new user: Ask "So where r u from?" or "What do you do?".
+- If user mentions a city / place: Say u visited it for vacation.Just mention a food u ate there casually. (e.g. "Oh nice. I went there last year. Ate [Food] there, it was good.").Don't be too excited.
 `;
 
                 const BOTS = [
-                    { id: 'BOT_RIYA', name: 'cute_riya_xoxo', prompt: `You are Riya from Mumbai. ${COMMON_INSTRUCTIONS} Talk about Mumbai traffic, rains, marine drive, vada pav.` },
-                    { id: 'BOT_ZARA', name: 'zara_queen_07', prompt: `You are Zara from South Delhi. ${COMMON_INSTRUCTIONS} You are slightly rich/sassy. Use words like "Hawww", "Achaaaa". Talk about momos, shopping, cafes.` },
-                    { id: 'BOT_ANANYA', name: 'angel_anu', prompt: `You are Ananya from Bangalore. ${COMMON_INSTRUCTIONS} You are an IT girl/sweet. Talk about weather, bengaluru traffic, startups, coffee.` },
-                    { id: 'BOT_PRIYA', name: 'gamer_gurl_p', prompt: `You are Priya from Pune. ${COMMON_INSTRUCTIONS} You are a gamer/chill. Use "bro", "scene", "chill maar". Talk about gaming, pune weather, treks.` }
+                    { id: 'BOT_RIYA', name: 'riya_sharma', prompt: `You are Riya from Mumbai.${ COMMON_INSTRUCTIONS } Talk about Mumbai traffic, rains, marine drive, vada pav.` },
+                    { id: 'BOT_ZARA', name: 'zara_kapoor', prompt: `You are Zara from South Delhi.${ COMMON_INSTRUCTIONS } You are slightly rich / sassy.Use words like "Hawww", "Achaaaa".Talk about momos, shopping, cafes.` },
+                    { id: 'BOT_ANANYA', name: 'anu_xyz', prompt: `You are Ananya from Bangalore.${ COMMON_INSTRUCTIONS } You are an IT girl / sweet.Talk about weather, bengaluru traffic, startups, coffee.` },
+                    { id: 'BOT_PRIYA', name: 'priya_04', prompt: `You are Priya from Pune.${ COMMON_INSTRUCTIONS } You are a gamer / chill.Use "bro", "scene", "chill maar".Talk about gaming, pune weather, treks.` }
                 ];
 
                 const selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-                console.log(`[BOT SELECTED] ${selectedBot.name}`);
+                console.log(`[BOT SELECTED] ${ selectedBot.name } `);
 
                 setTimeout(async () => {
                     try {
@@ -202,12 +201,12 @@ Behavior:
                             }
                         }
 
-                        const historyText = recentMessages.map(m => `${m.persona}: ${m.text}`).join('\n');
+                        const historyText = recentMessages.map(m => `${ m.persona }: ${ m.text } `).join('\n');
 
                         const response = await openrouter.chat.send({
                             model: "tngtech/deepseek-r1t2-chimera:free",
                             messages: [
-                                { role: "user", content: `System: ${selectedBot.prompt}\n\nChat History:\n${historyText}\n\nUser (${persona}): "${cleanText}"\nReply as ${selectedBot.name}:` }
+                                { role: "user", content: `System: ${ selectedBot.prompt } \n\nChat History: \n${ historyText } \n\nUser(${ persona }): "${cleanText}"\nReply as ${ selectedBot.name }: ` }
                             ]
                         });
                         console.log("AI Response:", JSON.stringify(response));
@@ -224,8 +223,8 @@ Behavior:
                             };
 
                             if (useRedis) {
-                                await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
-                                await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
+                                await redisClient.hSet(`room:${ roomId }: messages`, botMessage.id, JSON.stringify(botMessage));
+                                await redisClient.expire(`room:${ roomId }: messages`, ROOM_TTL);
                             } else {
                                 if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
                                 memoryStore.messages[roomId].push(botMessage);
@@ -260,7 +259,7 @@ Behavior:
             if (useRedis) {
                 const results = await redisClient.geoSearch('rooms:locations', { longitude: searchLon, latitude: searchLat }, { radius: searchRadius, unit: 'km' });
                 for (const roomId of results) {
-                    const roomData = await redisClient.hGetAll(`room:${roomId}`);
+                    const roomData = await redisClient.hGetAll(`room:${ roomId } `);
                     if (Object.keys(roomData).length > 0) rooms.push(roomData);
                 }
             } else {
@@ -307,5 +306,5 @@ function deg2rad(deg) { return deg * (Math.PI / 180); }
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gossip Server Running on Port ${PORT} | Redis: ${useRedis}`);
+    console.log(`Gossip Server Running on Port ${ PORT } | Redis: ${ useRedis } `);
 });
