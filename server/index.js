@@ -4,7 +4,8 @@ const { Server } = require('socket.io');
 const { createClient } = require('redis');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 console.log("---------------------------------------------------");
 console.log("SERVER STARTING...");
@@ -15,10 +16,15 @@ console.log("---------------------------------------------------");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 let model = null;
 try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key");
-    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    if (process.env.GEMINI_API_KEY) {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        console.log("✅ AI Model Initialized");
+    } else {
+        console.error("❌ AI Model Skipped (No Key)");
+    }
 } catch (e) {
-    console.error("Failed to init GPU model:", e);
+    console.error("Failed to init AI model:", e);
 }
 
 const app = express();
