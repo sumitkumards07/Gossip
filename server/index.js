@@ -17,6 +17,9 @@ const memoryStore = {
     messages: {}
 };
 
+// Global User Tracking for Admin
+const activeUsers = new Map(); // socket.id -> { persona, deviceId }
+
 let redisClient = null;
 let useRedis = false;
 
@@ -46,6 +49,10 @@ const ROOM_TTL = 3 * 60 * 60;
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
+    socket.on('set_persona', ({ persona, deviceId }) => {
+        activeUsers.set(socket.id, { persona, deviceId, timestamp: Date.now() });
+    });
 
     socket.on('create_room', async ({ name, latitude, longitude }) => {
         try {
@@ -96,7 +103,7 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('new_message', message);
     });
 
-    socket.on('get_nearby_rooms', async ({ latitude, longitude, radiusKm = 10 }) => {
+    socket.on('get_nearby_rooms', async ({ latitude, longitude, radiusKm = 50 }) => {
         try {
             const rooms = [];
             if (useRedis) {
@@ -116,7 +123,27 @@ io.on('connection', (socket) => {
         } catch (err) { console.error(err); }
     });
 
-    socket.on('disconnect', () => { console.log('User connected:', socket.id); });
+    // Admin Stats
+    socket.on('get_admin_stats', async () => {
+        const rooms = [];
+        if (useRedis) {
+            const keys = await redisClient.keys('room:*');
+            for (const key of keys) {
+                const data = await redisClient.hGetAll(key);
+                rooms.push(data);
+            }
+        } else {
+            Object.values(memoryStore.rooms).forEach(r => rooms.push(r));
+        }
+
+        const users = Array.from(activeUsers.values());
+        socket.emit('admin_stats', { rooms, users });
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+        activeUsers.delete(socket.id);
+    });
 });
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
@@ -130,3 +157,4 @@ const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
     console.log(`Gossip Server Running on Port ${PORT} | Redis: ${useRedis}`);
 });
+落户

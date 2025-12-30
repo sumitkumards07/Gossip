@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DiscoveryView from './views/DiscoveryView'
 import ChatView from './views/ChatView'
 import OnboardingView from './views/OnboardingView'
+import AdminView from './views/AdminView'
 import { useLocation } from './context/LocationContext'
+import { useSocket } from './context/SocketContext'
 import { v4 as uuidv4 } from 'uuid'
 
 function App() {
   const { location, error, loading } = useLocation();
+  const { socket } = useSocket();
   const [username, setUsername] = useState<string | null>(localStorage.getItem('gossip_user'));
   const [deviceId] = useState<string>(() => {
     const saved = localStorage.getItem('gossip_device_id');
@@ -16,12 +19,23 @@ function App() {
     localStorage.setItem('gossip_device_id', newId);
     return newId;
   });
-  const [currentView, setCurrentView] = useState<'discovery' | 'chat'>('discovery');
+  const [currentView, setCurrentView] = useState<'onboarding' | 'discovery' | 'chat' | 'admin'>(() => {
+    if (window.location.pathname === '/g2209') return 'admin';
+    return 'discovery';
+  });
   const [activeRoom, setActiveRoom] = useState<{ id: string, name: string } | null>(null);
+
+  // Sync persona with server for admin tracking
+  useEffect(() => {
+    if (socket && username) {
+      socket.emit('set_persona', { persona: username, deviceId });
+    }
+  }, [socket, username, deviceId]);
 
   const handleOnboardingComplete = (name: string) => {
     localStorage.setItem('gossip_user', name);
     setUsername(name);
+    setCurrentView('discovery');
   };
 
   const handleJoinRoom = (id: string, name: string) => {
@@ -33,6 +47,10 @@ function App() {
     setCurrentView('discovery');
     setTimeout(() => setActiveRoom(null), 500);
   };
+
+  if (currentView === 'admin') {
+    return <AdminView onBack={() => { window.history.pushState({}, '', '/'); setCurrentView('discovery'); }} />;
+  }
 
   if (loading) {
     return (
