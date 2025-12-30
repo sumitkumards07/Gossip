@@ -73,7 +73,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom }) => {
                 alert('Server failed to create room: ' + response?.error);
             }
         });
-        alert(`Request sent to create room: ${name}. Waiting for server response...`);
+        // alert(`Request sent to create room: ${name}. Waiting for server response...`);
     };
 
     return (
