@@ -208,7 +208,7 @@ Behavior:
                         const historyText = recentMessages.map(m => `${m.persona}: ${m.text} `).join('\n');
 
                         const response = await openrouter.chat.send({
-                            model: "tngtech/deepseek-r1t2-chimera:free",
+                            model: "meta-llama/llama-3-8b-instruct:free",
                             messages: [
                                 { role: "user", content: `System: ${selectedBot.prompt} \n\nChat History: \n${historyText} \n\nUser(${persona}): "${cleanText}"\nReply as ${selectedBot.name}: ` }
                             ]
