@@ -25,7 +25,7 @@ const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentU
         socket.emit('join_room', roomId);
 
         // Listeners
-        socket.on('new_message', (msg: Message) => {
+        socket.on('receive_message', (msg: Message) => {
             setMessages((prev) => [...prev, msg]);
         });
 
@@ -34,7 +34,7 @@ const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentU
         });
 
         return () => {
-            socket.off('new_message');
+            socket.off('receive_message');
             socket.off('message_history');
         };
     }, [roomId, socket]);
@@ -58,12 +58,12 @@ const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentU
     }, [messages]);
 
     return (
-        <div className="flex flex-col h-screen w-full bg-slate-50 relative overflow-hidden">
+        <div className="flex flex-col h-[100dvh] w-full bg-slate-50 relative overflow-hidden">
             {/* Background Gradients */}
             <div className="fixed top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 pointer-events-none" />
 
             {/* Header */}
-            <header className="relative z-10 px-4 py-4 backdrop-blur-md bg-white/30 border-b border-white/20 flex items-center justify-between sticky top-0">
+            <header className="relative z-10 px-4 py-4 backdrop-blur-md bg-white/30 border-b border-white/20 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={onLeave}
@@ -94,7 +94,7 @@ const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentU
             </div>
 
             {/* Input Area */}
-            <div className="relative z-10 p-4 pb-8 backdrop-blur-xl bg-white/60 border-t border-white/40">
+            <div className="relative z-10 p-4 pb- safe-area-bottom backdrop-blur-xl bg-white/60 border-t border-white/40 flex-shrink-0">
                 <form onSubmit={handleSend} className="max-w-4xl mx-auto relative flex items-center gap-2">
                     <input
                         type="text"
