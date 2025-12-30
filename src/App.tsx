@@ -4,15 +4,23 @@ import DiscoveryView from './views/DiscoveryView'
 import ChatView from './views/ChatView'
 import OnboardingView from './views/OnboardingView'
 import { useLocation } from './context/LocationContext'
+import { v4 as uuidv4 } from 'uuid'
 
 function App() {
   const { location, error, loading } = useLocation();
-  const [username, setUsername] = useState<string | null>(localStorage.getItem('whisper_user'));
+  const [username, setUsername] = useState<string | null>(localStorage.getItem('gossip_user'));
+  const [deviceId] = useState<string>(() => {
+    const saved = localStorage.getItem('gossip_device_id');
+    if (saved) return saved;
+    const newId = uuidv4();
+    localStorage.setItem('gossip_device_id', newId);
+    return newId;
+  });
   const [currentView, setCurrentView] = useState<'discovery' | 'chat'>('discovery');
   const [activeRoom, setActiveRoom] = useState<{ id: string, name: string } | null>(null);
 
   const handleOnboardingComplete = (name: string) => {
-    localStorage.setItem('whisper_user', name);
+    localStorage.setItem('gossip_user', name);
     setUsername(name);
   };
 
@@ -90,7 +98,8 @@ function App() {
                 roomId={activeRoom.id}
                 roomName={activeRoom.name}
                 onLeave={handleLeaveRoom}
-                currentUserPersona={username}
+                currentUserPersona={username || 'Anonymous'}
+                deviceId={deviceId}
               />
             )}
           </motion.div>

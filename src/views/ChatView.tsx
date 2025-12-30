@@ -9,9 +9,10 @@ interface ChatViewProps {
     roomName: string;
     onLeave: () => void;
     currentUserPersona: string;
+    deviceId: string;
 }
 
-const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentUserPersona }) => {
+const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentUserPersona, deviceId }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -45,7 +46,7 @@ const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentU
         socket.emit('send_message', {
             roomId,
             text: inputText,
-            senderId: socket.id,
+            senderId: deviceId,
             persona: currentUserPersona
         });
 
@@ -87,7 +88,7 @@ const ChatView: React.FC<ChatViewProps> = ({ roomId, roomName, onLeave, currentU
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 relative z-10 scrollbar-hide">
                 {messages.map((msg) => (
-                    <MessageBubble key={msg.id} message={{ ...msg, isMe: socket?.id === msg.senderId }} />
+                    <MessageBubble key={msg.id} message={{ ...msg, isMe: deviceId === msg.senderId }} />
                 ))}
                 <div ref={bottomRef} className="h-4" />
             </div>
