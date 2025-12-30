@@ -9,22 +9,24 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 console.log("---------------------------------------------------");
 console.log("SERVER STARTING...");
-console.log("GEMINI_API_KEY Status:", process.env.GEMINI_API_KEY ? "✅ FOUND" : "❌ MISSING (Check .env)");
+console.log("OPENROUTER_API_KEY Status:", process.env.OPENROUTER_API_KEY ? "✅ FOUND" : "❌ MISSING (Check .env)");
 console.log("---------------------------------------------------");
 
-// Google Gemini AI Setup
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-let model = null;
+// OpenRouter AI Setup (OpenAI-compatible)
+const OpenAI = require('openai');
+let openai = null;
 try {
-    if (process.env.GEMINI_API_KEY) {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        console.log("✅ AI Model Initialized");
+    if (process.env.OPENROUTER_API_KEY) {
+        openai = new OpenAI({
+            baseURL: "https://openrouter.ai/api/v1",
+            apiKey: process.env.OPENROUTER_API_KEY,
+        });
+        console.log("✅ AI Client Initialized (OpenRouter)");
     } else {
-        console.error("❌ AI Model Skipped (No Key)");
+        console.error("❌ AI Client Skipped (No Key)");
     }
 } catch (e) {
-    console.error("Failed to init AI model:", e);
+    console.error("Failed to init AI client:", e);
 }
 
 const app = express();
@@ -175,15 +177,12 @@ io.on('connection', (socket) => {
 
                 setTimeout(async () => {
                     try {
-                        if (!model) throw new Error("GenerativeModel not initialized");
+                        if (!openai) throw new Error("OpenRouter client not initialized");
                         console.log("[BOT AI] Starting generation...");
                         // Get recent context (last 5 messages)
                         let recentMessages = [];
                         if (useRedis) {
-                            // detailed redis fetching omitted for simplicity/speed, using just current text for now 
-                            // to avoid complex async logic in this quick iteration, 
-                            // but ideally we'd range query redis. 
-                            // For memoryStore it's easy:
+                            // omitted for simplicity
                         } else {
                             if (memoryStore.messages[roomId]) {
                                 recentMessages = memoryStore.messages[roomId].slice(-5);
@@ -192,16 +191,16 @@ io.on('connection', (socket) => {
 
                         const historyText = recentMessages.map(m => `${m.persona}: ${m.text}`).join('\n');
 
-                        const chat = model.startChat({
-                            history: [
-                                { role: "user", parts: [{ text: `Context: You are in a group chat. behave like a real person.\n\nRecent Chat History:\n${historyText}` }] },
-                                { role: "model", parts: [{ text: `Understood. I am ${selectedBot.name}. ${selectedBot.prompt}` }] }
-                            ],
-                            generationConfig: { maxOutputTokens: 60 }
+                        const completion = await openai.chat.completions.create({
+                            model: "google/gemini-2.5-flash-preview",
+                            max_tokens: 60,
+                            messages: [
+                                { role: "system", content: `${selectedBot.prompt}\n\nYou are in a group chat. Recent history:\n${historyText}` },
+                                { role: "user", content: `Someone (${persona}) said: "${cleanText}". Reply naturally as ${selectedBot.name}. Keep it very short.` }
+                            ]
                         });
 
-                        const result = await chat.sendMessage(`Someone (${persona}) said: "${cleanText}". Reply naturally as ${selectedBot.name}.`);
-                        const botReplyText = result.response.text().trim();
+                        const botReplyText = completion.choices[0]?.message?.content?.trim();
 
                         if (botReplyText) {
                             const botMessage = {
