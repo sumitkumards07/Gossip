@@ -57,7 +57,15 @@ io.on('connection', (socket) => {
     socket.on('create_room', async ({ name, latitude, longitude }) => {
         try {
             const roomId = uuidv4();
-            const roomData = { id: roomId, name, latitude, longitude, createdAt: Date.now(), participants: 0 };
+            const roomData = {
+                id: roomId,
+                name,
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
+                createdAt: Date.now(),
+                participants: 0
+            };
+
             if (useRedis) {
                 await redisClient.hSet(`room:${roomId}`, roomData);
                 await redisClient.expire(`room:${roomId}`, ROOM_TTL);
@@ -65,6 +73,7 @@ io.on('connection', (socket) => {
             } else {
                 memoryStore.rooms[roomId] = roomData;
             }
+            console.log(`Room created: ${name} at ${latitude}, ${longitude}`);
             socket.emit('room_created', roomData);
         } catch (err) { console.error(err); }
     });
@@ -106,8 +115,12 @@ io.on('connection', (socket) => {
     socket.on('get_nearby_rooms', async ({ latitude, longitude, radiusKm = 50 }) => {
         try {
             const rooms = [];
+            const searchLat = parseFloat(latitude);
+            const searchLon = parseFloat(longitude);
+            const searchRadius = parseFloat(radiusKm);
+
             if (useRedis) {
-                const results = await redisClient.geoSearch('rooms:locations', { longitude, latitude }, { radius: radiusKm, unit: 'km' });
+                const results = await redisClient.geoSearch('rooms:locations', { longitude: searchLon, latitude: searchLat }, { radius: searchRadius, unit: 'km' });
                 for (const roomId of results) {
                     const roomData = await redisClient.hGetAll(`room:${roomId}`);
                     if (Object.keys(roomData).length > 0) rooms.push(roomData);
@@ -115,8 +128,10 @@ io.on('connection', (socket) => {
             } else {
                 for (const roomId in memoryStore.rooms) {
                     const r = memoryStore.rooms[roomId];
-                    const dist = getDistanceFromLatLonInKm(latitude, longitude, r.latitude, r.longitude);
-                    if (dist <= radiusKm) rooms.push(r);
+                    const dist = getDistanceFromLatLonInKm(searchLat, searchLon, r.latitude, r.longitude);
+                    if (dist <= searchRadius) {
+                        rooms.push(r);
+                    }
                 }
             }
             socket.emit('nearby_rooms', rooms);
@@ -141,7 +156,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
         activeUsers.delete(socket.id);
     });
 });
@@ -157,4 +171,3 @@ const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
     console.log(`Gossip Server Running on Port ${PORT} | Redis: ${useRedis}`);
 });
-落户
