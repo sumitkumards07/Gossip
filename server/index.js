@@ -6,6 +6,21 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
+console.log("---------------------------------------------------");
+console.log("SERVER STARTING...");
+console.log("GEMINI_API_KEY Status:", process.env.GEMINI_API_KEY ? "✅ FOUND" : "❌ MISSING (Check .env)");
+console.log("---------------------------------------------------");
+
+// Google Gemini AI Setup
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+let model = null;
+try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key");
+    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+} catch (e) {
+    console.error("Failed to init GPU model:", e);
+}
+
 const app = express();
 app.use(cors());
 
@@ -197,7 +212,15 @@ io.on('connection', (socket) => {
                         }
                     } catch (error) {
                         console.error("AI Error:", error);
-                        // Fallback silent fail - bot just doesn't reply
+                        // Fallback response so we know it tried
+                        const botMessage = {
+                            id: uuidv4(),
+                            text: "Oops, my AI brain is acting up! 😵‍💫 (Check Server Logs)",
+                            senderId: selectedBot.id,
+                            persona: selectedBot.name,
+                            timestamp: new Date().toISOString()
+                        };
+                        io.to(roomId).emit('receive_message', botMessage);
                     }
                 }, 1500 + Math.random() * 3000);
             }
