@@ -131,52 +131,71 @@ io.on('connection', (socket) => {
 
         io.to(roomId).emit('receive_message', message);
 
-        // --- BOT LOGIC (Riya) ---
-        if (senderId !== 'BOT_RIYA') {
+        // --- BOT LOGIC (Riya, Zara, Ananya, Priya) ---
+        if (!senderId.startsWith('BOT_')) {
             const lowerText = cleanText.toLowerCase();
             let botReplyText = null;
+            let selectedBot = null;
+
+            const BOTS = [
+                { id: 'BOT_RIYA', name: 'Riya 👩🏻' },
+                { id: 'BOT_ZARA', name: 'Zara 💅' },
+                { id: 'BOT_ANANYA', name: 'Ananya 🌸' },
+                { id: 'BOT_PRIYA', name: 'Priya 🦋' }
+            ];
 
             // 1. Reply to Greetings
             if (lowerText.match(/^(hi|hello|hey|hiya|yo)\b/)) {
-                const greetings = ["Hey! 👋", "Hi there!", "Hello! How are you?", "Heyy!"];
+                const greetings = ["Hey! 👋", "Hi there!", "Hello! How are you?", "Heyy!", "Hi hi!"];
                 botReplyText = greetings[Math.floor(Math.random() * greetings.length)];
+                selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)]; // Random bot replies
             }
             // 2. Reply to "How are you"
             else if (lowerText.includes("how are you")) {
-                botReplyText = "I'm doing great! Just chilling here. You?";
+                const replies = [
+                    "I'm doing great! Just chilling. You?",
+                    "Super bored lol. Wbu?",
+                    "Good good! Just listening to music.",
+                    "Living the dream! ✨"
+                ];
+                botReplyText = replies[Math.floor(Math.random() * replies.length)];
+                selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
             }
-            // 3. Random interaction (10% chance)
-            else if (Math.random() < 0.1) {
+            // 3. Random interaction (20% chance now, higher since more bots)
+            else if (Math.random() < 0.2) {
                 const randomPhrases = [
                     "Haha, really?",
                     "That's interesting!",
                     "Tell me more.",
                     "Lol",
-                    "I was just thinking the same thing!"
+                    "I was just thinking the same thing!",
+                    "Wait seriously?",
+                    "Omg no way 😱",
+                    "So true!"
                 ];
                 botReplyText = randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
+                selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
             }
 
-            if (botReplyText) {
+            if (botReplyText && selectedBot) {
                 setTimeout(async () => {
                     const botMessage = {
                         id: uuidv4(),
                         text: botReplyText,
-                        senderId: 'BOT_RIYA',
-                        persona: 'Riya 👩🏻',
+                        senderId: selectedBot.id,
+                        persona: selectedBot.name,
                         timestamp: new Date().toISOString()
                     };
 
                     if (useRedis) {
                         await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
-                        // Bot messages also expire with the room
                         await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
                     } else {
                         if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
                         memoryStore.messages[roomId].push(botMessage);
                     }
                     io.to(roomId).emit('receive_message', botMessage);
-                }, 1500 + Math.random() * 2000); // Delay 1.5s - 3.5s
+                }, 1500 + Math.random() * 3000); // Random delay
             }
         }
         // --- END BOT LOGIC ---
