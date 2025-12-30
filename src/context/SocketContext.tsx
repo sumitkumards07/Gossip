@@ -21,6 +21,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             reconnectionAttempts: 5
         });
 
+        newSocket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err);
+            // alert('Socket connection error: ' + err.message);
+        });
+
         newSocket.on('connect', () => {
             console.log('Socket connected to:', SOCKET_URL);
             setIsConnected(true);

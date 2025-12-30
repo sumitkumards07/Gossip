@@ -48,12 +48,25 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom }) => {
     }, [socket, location, onJoinRoom]);
 
     const handleCreateRoom = (name: string) => {
-        if (!socket || !location) return;
+        console.log('Attempting to create room:', name);
+        console.log('Socket state:', socket?.connected);
+        console.log('Location state:', location);
+
+        if (!socket) {
+            alert('Error: Socket connection not established.');
+            return;
+        }
+        if (!location) {
+            alert('Error: Location not available. Please allow location access.');
+            return;
+        }
+
         socket.emit('create_room', {
             name,
             latitude: location.latitude,
             longitude: location.longitude
         });
+        alert(`Request sent to create room: ${name}`);
     };
 
     return (
