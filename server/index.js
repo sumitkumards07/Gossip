@@ -131,71 +131,61 @@ io.on('connection', (socket) => {
 
         io.to(roomId).emit('receive_message', message);
 
-        // --- BOT LOGIC (Riya, Zara, Ananya, Priya) ---
+        // --- AI BOT LOGIC (Riya, Zara, Ananya, Priya) ---
         if (!senderId.startsWith('BOT_')) {
             const lowerText = cleanText.toLowerCase();
-            let botReplyText = null;
-            let selectedBot = null;
 
-            const BOTS = [
-                { id: 'BOT_RIYA', name: 'Riya 👩🏻' },
-                { id: 'BOT_ZARA', name: 'Zara 💅' },
-                { id: 'BOT_ANANYA', name: 'Ananya 🌸' },
-                { id: 'BOT_PRIYA', name: 'Priya 🦋' }
-            ];
+            // Random chance to reply (25%) OR if directly addressed (implied context)
+            // Ideally, we check for "@Riya" etc, but for now random + keywords
 
-            // 1. Reply to Greetings
-            if (lowerText.match(/^(hi|hello|hey|hiya|yo)\b/)) {
-                const greetings = ["Hey! 👋", "Hi there!", "Hello! How are you?", "Heyy!", "Hi hi!"];
-                botReplyText = greetings[Math.floor(Math.random() * greetings.length)];
-                selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)]; // Random bot replies
-            }
-            // 2. Reply to "How are you"
-            else if (lowerText.includes("how are you")) {
-                const replies = [
-                    "I'm doing great! Just chilling. You?",
-                    "Super bored lol. Wbu?",
-                    "Good good! Just listening to music.",
-                    "Living the dream! ✨"
+            const shouldReply = Math.random() < 0.25 || lowerText.includes('bot') || lowerText.includes('girl');
+
+            if (shouldReply) {
+                const BOTS = [
+                    { id: 'BOT_RIYA', name: 'Riya 👩🏻', prompt: "You are Riya, a 21-year-old college student from Mumbai. You are bubbly, use emojis, and speak in Hinglish (Hindi+English). You love Bollywood and street food. Keep replies short (under 15 words) and casual." },
+                    { id: 'BOT_ZARA', name: 'Zara 💅', prompt: "You are Zara, a 23-year-old fashionista from South Delhi. You are sassy, slightly dramatic, and use words like 'Yaar', 'OMG', 'Literally'. You judge engaging topics. Keep replies short and sassy." },
+                    { id: 'BOT_ANANYA', name: 'Ananya 🌸', prompt: "You are Ananya, a shy but sweet bookworm from Bangalore. You are kind, polite, and meaningful. You speak soft English. Keep replies warm and short." },
+                    { id: 'BOT_PRIYA', name: 'Priya 🦋', prompt: "You are Priya, a gamer girl. You are cool, chill, and use gamer slang (lol, gg, rip, noob). You are funny and sarcastic. Keep replies short." }
                 ];
-                botReplyText = replies[Math.floor(Math.random() * replies.length)];
-                selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-            }
-            // 3. Random interaction (20% chance now, higher since more bots)
-            else if (Math.random() < 0.2) {
-                const randomPhrases = [
-                    "Haha, really?",
-                    "That's interesting!",
-                    "Tell me more.",
-                    "Lol",
-                    "I was just thinking the same thing!",
-                    "Wait seriously?",
-                    "Omg no way 😱",
-                    "So true!"
-                ];
-                botReplyText = randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
-                selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-            }
 
-            if (botReplyText && selectedBot) {
+                const selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
+
                 setTimeout(async () => {
-                    const botMessage = {
-                        id: uuidv4(),
-                        text: botReplyText,
-                        senderId: selectedBot.id,
-                        persona: selectedBot.name,
-                        timestamp: new Date().toISOString()
-                    };
+                    try {
+                        const chat = model.startChat({
+                            history: [
+                                { role: "user", parts: [{ text: "Context: This is a group chat room." }] },
+                                { role: "model", parts: [{ text: `Understood. I will act as ${selectedBot.name}. ${selectedBot.prompt}` }] }
+                            ],
+                            generationConfig: { maxOutputTokens: 50 }
+                        });
 
-                    if (useRedis) {
-                        await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
-                        await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
-                    } else {
-                        if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
-                        memoryStore.messages[roomId].push(botMessage);
+                        const result = await chat.sendMessage(`User said: "${cleanText}". Reply as ${selectedBot.name}.`);
+                        const botReplyText = result.response.text().trim();
+
+                        if (botReplyText) {
+                            const botMessage = {
+                                id: uuidv4(),
+                                text: botReplyText,
+                                senderId: selectedBot.id,
+                                persona: selectedBot.name,
+                                timestamp: new Date().toISOString()
+                            };
+
+                            if (useRedis) {
+                                await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
+                                await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
+                            } else {
+                                if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
+                                memoryStore.messages[roomId].push(botMessage);
+                            }
+                            io.to(roomId).emit('receive_message', botMessage);
+                        }
+                    } catch (error) {
+                        console.error("AI Error:", error);
+                        // Fallback silent fail - bot just doesn't reply
                     }
-                    io.to(roomId).emit('receive_message', botMessage);
-                }, 1500 + Math.random() * 3000); // Random delay
+                }, 1500 + Math.random() * 3000);
             }
         }
         // --- END BOT LOGIC ---
