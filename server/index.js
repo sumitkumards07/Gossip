@@ -9,10 +9,10 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 console.log("---------------------------------------------------");
 console.log("SERVER STARTING...");
-console.log("OPENROUTER_API_KEY Status:", process.env.OPENROUTER_API_KEY ? "✅ FOUND" : "❌ MISSING (Check .env)");
+console.log("OPENROUTER_API_KEY Status:", process.env.OPENROUTER_API_KEY ? "✅ FOUND" : "❌ MISSING");
 console.log("---------------------------------------------------");
 
-// OpenRouter SDK Setup
+// OpenRouter SDK Setup (Optional now that we use fetch, but keeping for compatibility)
 const { OpenRouter } = require('@openrouter/sdk');
 let openrouter = null;
 try {
@@ -193,7 +193,6 @@ Behavior:
 
                 setTimeout(async () => {
                     try {
-                        if (!openrouter) throw new Error("OpenRouter client not initialized");
                         console.log("[BOT AI] Starting generation...");
                         // Get recent context (last 5 messages)
                         let recentMessages = [];
@@ -207,16 +206,42 @@ Behavior:
 
                         const historyText = recentMessages.map(m => `${m.persona}: ${m.text} `).join('\n');
 
-                        const response = await openrouter.chat.send({
-                            model: "meta-llama/llama-3-8b-instruct:free",
-                            messages: [
-                                { role: "system", content: selectedBot.prompt },
-                                { role: "user", content: cleanText }
-                            ]
-                        });
-                        console.log("AI Response:", JSON.stringify(response));
+                        let botReplyText = "";
+                        try {
+                            const modelId = "meta-llama/llama-3.3-70b-instruct:free";
+                            console.log(`[DEBUG] Calling OpenRouter (fetch) with model: ${modelId}`);
 
-                        let botReplyText = response.choices?.[0]?.message?.content?.trim();
+                            const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                                method: "POST",
+                                headers: {
+                                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                                    "HTTP-Referer": "https://github.com/sumitkumards07/Gossip",
+                                    "X-Title": "Gossip App",
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({
+                                    model: modelId,
+                                    messages: [
+                                        { role: "system", content: selectedBot.prompt },
+                                        { role: "user", content: cleanText }
+                                    ]
+                                })
+                            });
+
+                            const data = await apiResponse.json();
+                            if (!apiResponse.ok) {
+                                console.error("[ERROR] OpenRouter API Status:", apiResponse.status);
+                                console.error("[ERROR] OpenRouter API Error Payload:", JSON.stringify(data));
+                                throw new Error(data.error?.message || `API error ${apiResponse.status}`);
+                            }
+
+                            console.log("[DEBUG] OpenRouter response received:", JSON.stringify(data));
+                            botReplyText = data.choices?.[0]?.message?.content?.trim();
+                        } catch (apiErr) {
+                            console.error("[ERROR] Bot AI request failed:", apiErr.message);
+                            throw apiErr;
+                        }
+
                         // Remove surrounding quotes if present
                         if (botReplyText && botReplyText.startsWith('"') && botReplyText.endsWith('"')) {
                             botReplyText = botReplyText.slice(1, -1);
@@ -232,8 +257,8 @@ Behavior:
                             };
 
                             if (useRedis) {
-                                await redisClient.hSet(`room:${roomId}: messages`, botMessage.id, JSON.stringify(botMessage));
-                                await redisClient.expire(`room:${roomId}: messages`, ROOM_TTL);
+                                await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
+                                await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
                             } else {
                                 if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
                                 memoryStore.messages[roomId].push(botMessage);
@@ -268,7 +293,7 @@ Behavior:
             if (useRedis) {
                 const results = await redisClient.geoSearch('rooms:locations', { longitude: searchLon, latitude: searchLat }, { radius: searchRadius, unit: 'km' });
                 for (const roomId of results) {
-                    const roomData = await redisClient.hGetAll(`room:${roomId} `);
+                    const roomData = await redisClient.hGetAll(`room:${roomId}`);
                     if (Object.keys(roomData).length > 0) rooms.push(roomData);
                 }
             } else {
@@ -315,5 +340,5 @@ function deg2rad(deg) { return deg * (Math.PI / 180); }
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gossip Server Running on Port ${PORT} | Redis: ${useRedis} `);
+    console.log(`Gossip Server Running on Port ${PORT} | Redis: ${useRedis}`);
 });
