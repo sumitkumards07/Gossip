@@ -98,9 +98,18 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_message', async ({ roomId, text, senderId, persona }) => {
+        // Basic Profanity Filter
+        const BAD_WORDS = ['abuse', 'badword', 'kill', 'stupid', 'idiot', 'hate', 'racist', 'ugly', 'nasty']; // Add more as needed
+        let cleanText = text;
+
+        BAD_WORDS.forEach(word => {
+            const regex = new RegExp(`\\b${word}\\b`, 'gi');
+            cleanText = cleanText.replace(regex, '****');
+        });
+
         const message = {
             id: uuidv4(),
-            text,
+            text: cleanText,
             senderId,
             persona: persona || 'Anonymous',
             timestamp: new Date().toISOString()
