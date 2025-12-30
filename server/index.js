@@ -192,7 +192,7 @@ io.on('connection', (socket) => {
                         const historyText = recentMessages.map(m => `${m.persona}: ${m.text}`).join('\n');
 
                         const completion = await openai.chat.completions.create({
-                            model: "google/gemini-2.5-flash-preview",
+                            model: "meta-llama/llama-3.2-3b-instruct:free",
                             max_tokens: 60,
                             messages: [
                                 { role: "system", content: `${selectedBot.prompt}\n\nYou are in a group chat. Recent history:\n${historyText}` },
