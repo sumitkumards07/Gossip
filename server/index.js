@@ -277,7 +277,7 @@ Behavior:
                         };
                         io.to(roomId).emit('receive_message', botMessage);
                     }
-                }, 1500 + Math.random() * 3000);
+                }, 300 + Math.random() * 700);
             }
         }
         // --- END BOT LOGIC ---
