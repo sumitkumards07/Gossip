@@ -122,14 +122,64 @@ io.on('connection', (socket) => {
         };
 
         if (useRedis) {
-            await redisClient.rPush(`messages:${roomId}`, JSON.stringify(message));
-            await redisClient.expire(`messages:${roomId}`, ROOM_TTL);
+            await redisClient.hSet(`room:${roomId}:messages`, message.id, JSON.stringify(message));
+            await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
         } else {
             if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
             memoryStore.messages[roomId].push(message);
         }
 
-        io.to(roomId).emit('new_message', message);
+        io.to(roomId).emit('receive_message', message);
+
+        // --- BOT LOGIC (Riya) ---
+        if (senderId !== 'BOT_RIYA') {
+            const lowerText = cleanText.toLowerCase();
+            let botReplyText = null;
+
+            // 1. Reply to Greetings
+            if (lowerText.match(/^(hi|hello|hey|hiya|yo)\b/)) {
+                const greetings = ["Hey! 👋", "Hi there!", "Hello! How are you?", "Heyy!"];
+                botReplyText = greetings[Math.floor(Math.random() * greetings.length)];
+            }
+            // 2. Reply to "How are you"
+            else if (lowerText.includes("how are you")) {
+                botReplyText = "I'm doing great! Just chilling here. You?";
+            }
+            // 3. Random interaction (10% chance)
+            else if (Math.random() < 0.1) {
+                const randomPhrases = [
+                    "Haha, really?",
+                    "That's interesting!",
+                    "Tell me more.",
+                    "Lol",
+                    "I was just thinking the same thing!"
+                ];
+                botReplyText = randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
+            }
+
+            if (botReplyText) {
+                setTimeout(async () => {
+                    const botMessage = {
+                        id: uuidv4(),
+                        text: botReplyText,
+                        senderId: 'BOT_RIYA',
+                        persona: 'Riya 👩🏻',
+                        timestamp: new Date().toISOString()
+                    };
+
+                    if (useRedis) {
+                        await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
+                        // Bot messages also expire with the room
+                        await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
+                    } else {
+                        if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
+                        memoryStore.messages[roomId].push(botMessage);
+                    }
+                    io.to(roomId).emit('receive_message', botMessage);
+                }, 1500 + Math.random() * 2000); // Delay 1.5s - 3.5s
+            }
+        }
+        // --- END BOT LOGIC ---
     });
 
     socket.on('get_nearby_rooms', async ({ latitude, longitude, radiusKm = 50 }) => {
