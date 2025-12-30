@@ -22,14 +22,14 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom }) => {
             socket.emit('get_nearby_rooms', {
                 latitude: location.latitude,
                 longitude: location.longitude,
-                radiusKm: 50
+                radiusKm: 2000
             });
         }, 5000);
 
         socket.emit('get_nearby_rooms', {
             latitude: location.latitude,
             longitude: location.longitude,
-            radiusKm: 50
+            radiusKm: 2000
         });
 
         socket.on('nearby_rooms', (rooms) => {
