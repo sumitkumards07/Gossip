@@ -204,12 +204,16 @@ Behavior:
                             }
                         }
 
-                        const historyText = recentMessages.map(m => `${m.persona}: ${m.text} `).join('\n');
-
                         let botReplyText = "";
                         try {
                             const modelId = "meta-llama/llama-3.3-70b-instruct:free";
                             console.log(`[DEBUG] Calling OpenRouter (fetch) with model: ${modelId}`);
+
+                            // Map history to OpenAI message format
+                            const historyMessages = recentMessages.map(m => ({
+                                role: m.persona === selectedBot.name ? "assistant" : "user",
+                                content: m.text
+                            }));
 
                             const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                                 method: "POST",
@@ -223,6 +227,7 @@ Behavior:
                                     model: modelId,
                                     messages: [
                                         { role: "system", content: selectedBot.prompt },
+                                        ...historyMessages,
                                         { role: "user", content: cleanText }
                                     ]
                                 })
