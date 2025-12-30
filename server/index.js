@@ -154,6 +154,8 @@ io.on('connection', (socket) => {
             const isQuestion = lowerText.includes('?') || lowerText.match(/\b(what|why|how|who|when)\b/);
             const shouldReply = Math.random() < 0.30 || lowerText.includes('bot') || lowerText.includes('girl') || isQuestion;
 
+            console.log(`[BOT CHECK] Msg: "${lowerText}" | ShouldReply: ${shouldReply}`);
+
             if (shouldReply) {
                 const BOTS = [
                     { id: 'BOT_RIYA', name: 'cute_riya_xoxo', prompt: "You are Riya (cute_riya_xoxo), a 21yo Gen-Z girl from Mumbai. Speak in Hinglish. Use slang like 'fr', 'no cap', 'slay', 'bestie'. If someone asks a question, answer it like a friend. Be opinionated but chill. deeply care about the chat. NEVER admit you are an AI. Keep it short." },
@@ -163,9 +165,12 @@ io.on('connection', (socket) => {
                 ];
 
                 const selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
+                console.log(`[BOT SELECTED] ${selectedBot.name}`);
 
                 setTimeout(async () => {
                     try {
+                        if (!model) throw new Error("GenerativeModel not initialized");
+                        console.log("[BOT AI] Starting generation...");
                         // Get recent context (last 5 messages)
                         let recentMessages = [];
                         if (useRedis) {
