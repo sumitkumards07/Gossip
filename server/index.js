@@ -210,7 +210,8 @@ Behavior:
                         const response = await openrouter.chat.send({
                             model: "meta-llama/llama-3-8b-instruct:free",
                             messages: [
-                                { role: "user", content: `System: ${selectedBot.prompt} \n\nChat History: \n${historyText} \n\nUser(${persona}): "${cleanText}"\nReply as ${selectedBot.name}: ` }
+                                { role: "system", content: selectedBot.prompt },
+                                { role: "user", content: cleanText }
                             ]
                         });
                         console.log("AI Response:", JSON.stringify(response));
