@@ -241,7 +241,7 @@ Core Guidelines:
 
                         let botReplyText = "";
                         try {
-                            const modelId = "nex-agi/deepseek-v3.1-nex-n1:free";
+                            const modelId = "mistralai/mistral-small-3.1-24b-instruct:free";
                             const apiStartTime = Date.now();
                             console.log(`[DEBUG] Calling OpenRouter (fetch) with model: ${modelId}`);
 
