@@ -20,10 +20,10 @@ socket.on("connect", () => {
             socket.emit("join_room", response.room.id);
 
             // Send message to trigger bot
-            console.log("Sending: 'Hi bot, are you there?'");
+            console.log("Sending: 'hi'");
             socket.emit("send_message", {
                 roomId: response.room.id,
-                text: "Hi bot, are you there?",
+                text: "hi",
                 senderId: "tester",
                 persona: "Tester"
             });

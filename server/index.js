@@ -159,9 +159,9 @@ io.on('connection', (socket) => {
 
             // Trigger: Random chance (30%), named mention, or question detection
             const isQuestion = lowerText.includes('?') || lowerText.match(/\b(what|why|how|who|when)\b/);
-            const shouldReply = Math.random() < 0.30 || lowerText.includes('bot') || lowerText.includes('girl') || isQuestion;
+            const shouldReply = true; // FORCE REPLY FOR DEBUGGING
 
-            console.log(`[BOT CHECK] Msg: "${lowerText}" | ShouldReply: ${shouldReply}`);
+            console.log(`[BOT TRIGGER] Msg: "${cleanText}" | Room: ${roomId} | ShouldReply: ${shouldReply}`);
 
             if (shouldReply) {
                 const COMMON_INSTRUCTIONS = `
@@ -173,13 +173,17 @@ Linguistic Style (Hinglish):
 - Write Hindi in Roman script (English alphabet).
 - Use Indian emojis RARELY (max 1 per chat, or none).
 Behavior:
-- Reply in a SINGLE line only. Max 10 words.
+- Reply in a SINGLE line only. Max 10 words. STRICTLY.
 - Change topics naturally. Don't engage in long conversations about one thing.
 - If someone says you are AI: Ask "Who is AI??". If they insist, say "Then leave the chat if u think that" or ask "What makes u think that? lol". Be defensive but casual.
 - If asking a new user: Ask "So where r u from?" or "What do you do?".
 - If user mentions a city/place: Say u visited it for vacation. Just mention a food u ate there casually. (e.g. "Oh nice. I went there last year. Ate [Food] there, it was good."). Don't be too excited.
 - Do NOT use quotation marks in your response.
+- DO NOT use "Yaar" in the first 3 messages.
 `;
+
+                const userCount = io.sockets.adapter.rooms.get(roomId)?.size || 0;
+                const isCrowded = userCount > 4;
 
                 const BOTS = [
                     { id: 'BOT_RIYA', name: 'riya', prompt: `You are Riya from Mumbai. HR at a startup (Hiring Manager).${COMMON_INSTRUCTIONS} Talk about hiring, interviews, office culture, rangoli competitions, finding talent.` },
@@ -188,8 +192,20 @@ Behavior:
                     { id: 'BOT_PRIYA', name: 'priya_04', prompt: `You are Priya from Pune. Student at Symbiosis.${COMMON_INSTRUCTIONS} Talk about projects, trekking plans, cafe hopping, late night gaming.` }
                 ];
 
-                const selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-                console.log(`[BOT SELECTED] ${selectedBot.name} `);
+                // If crowded (> 4 users): only 1 bot (Riya) and very short responses
+                const selectedBot = isCrowded ? BOTS[0] : BOTS[Math.floor(Math.random() * BOTS.length)];
+
+                // Probability of reply: 100% if not crowded, 30% if crowded to avoid spam
+                const finalShouldReply = isCrowded ? (Math.random() < 0.3) : true;
+
+                if (!finalShouldReply) return;
+
+                console.log(`[BOT SELECTED] ${selectedBot.name} (Crowded: ${isCrowded})`);
+
+                const wordLimit = isCrowded ? "5 words" : "10 words";
+                const systemPrompt = isCrowded
+                    ? `${selectedBot.prompt} Be EXTREMELY BRIEF. Max ${wordLimit}.`
+                    : selectedBot.prompt;
 
                 setTimeout(async () => {
                     try {
@@ -207,6 +223,7 @@ Behavior:
                         let botReplyText = "";
                         try {
                             const modelId = "meta-llama/llama-3.3-70b-instruct:free";
+                            const apiStartTime = Date.now();
                             console.log(`[DEBUG] Calling OpenRouter (fetch) with model: ${modelId}`);
 
                             // Map history to OpenAI message format
@@ -214,6 +231,7 @@ Behavior:
                                 role: m.persona === selectedBot.name ? "assistant" : "user",
                                 content: m.text
                             }));
+                            console.log(`[DEBUG] Context Messages: ${historyMessages.length}`);
 
                             const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                                 method: "POST",
@@ -226,7 +244,7 @@ Behavior:
                                 body: JSON.stringify({
                                     model: modelId,
                                     messages: [
-                                        { role: "system", content: selectedBot.prompt },
+                                        { role: "system", content: systemPrompt },
                                         ...historyMessages,
                                         { role: "user", content: cleanText }
                                     ]
@@ -234,13 +252,15 @@ Behavior:
                             });
 
                             const data = await apiResponse.json();
+                            const apiDuration = (Date.now() - apiStartTime) / 1000;
+
                             if (!apiResponse.ok) {
-                                console.error("[ERROR] OpenRouter API Status:", apiResponse.status);
+                                console.error(`[ERROR] OpenRouter API Status: ${apiResponse.status} (Took ${apiDuration}s)`);
                                 console.error("[ERROR] OpenRouter API Error Payload:", JSON.stringify(data));
                                 throw new Error(data.error?.message || `API error ${apiResponse.status}`);
                             }
 
-                            console.log("[DEBUG] OpenRouter response received:", JSON.stringify(data));
+                            console.log(`[DEBUG] OpenRouter response received in ${apiDuration}s`);
                             botReplyText = data.choices?.[0]?.message?.content?.trim();
                         } catch (apiErr) {
                             console.error("[ERROR] Bot AI request failed:", apiErr.message);
@@ -282,7 +302,7 @@ Behavior:
                         };
                         io.to(roomId).emit('receive_message', botMessage);
                     }
-                }, 300 + Math.random() * 700);
+                }, 100 + Math.random() * 200);
             }
         }
         // --- END BOT LOGIC ---
