@@ -79,8 +79,20 @@ const io = new Server(server, {
 
 const ROOM_TTL = 3 * 60 * 60;
 
+// Bot Pause State
+let botsPaused = false;
+
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
+    // Send initial bot status
+    socket.emit('bot_status', botsPaused);
+
+    socket.on('toggle_bots', (status) => {
+        botsPaused = status;
+        console.log(`[ADMIN] Bots are now ${botsPaused ? 'PAUSED' : 'ACTIVE'}`);
+        io.emit('bot_status', botsPaused); // Broadcast to all clients (admins)
+    });
 
     socket.on('set_persona', ({ persona, deviceId }) => {
         activeUsers.set(socket.id, { persona, deviceId, timestamp: Date.now() });
@@ -164,7 +176,12 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('receive_message', message);
 
         // --- AI BOT LOGIC (Riya, Zara, Ananya, Priya) ---
+        // BOT INTERCEPTION
         if (!senderId.startsWith('BOT_')) {
+            if (botsPaused) {
+                console.log(`[BOT BLOCKED] Bots are paused. Skipping trigger.`);
+                return;
+            }
             const lowerText = cleanText.toLowerCase();
 
             // Trigger: Random chance (30%), named mention, or question detection

@@ -7,6 +7,7 @@ const AdminView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { socket } = useSocket();
     const [stats, setStats] = useState<{ rooms: any[], users: any[] }>({ rooms: [], users: [] });
     const [loading, setLoading] = useState(true);
+    const [botsPaused, setBotsPaused] = useState(false);
 
     const fetchStats = () => {
         if (!socket) return;
@@ -14,14 +15,29 @@ const AdminView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         socket.emit('get_admin_stats');
     };
 
+    const toggleBots = () => {
+        if (!socket) return;
+        socket.emit('toggle_bots', !botsPaused);
+    };
+
     useEffect(() => {
         if (!socket) return;
         fetchStats();
+
         socket.on('admin_stats', (data) => {
             setStats(data);
             setLoading(false);
         });
-        return () => { socket.off('admin_stats'); };
+
+        // Listen for bot status updates
+        socket.on('bot_status', (status: boolean) => {
+            setBotsPaused(status);
+        });
+
+        return () => {
+            socket.off('admin_stats');
+            socket.off('bot_status');
+        };
     }, [socket]);
 
     return (
@@ -37,13 +53,27 @@ const AdminView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <h1 className="text-xl font-bold tracking-tighter uppercase">Gossip Command Center</h1>
                     </div>
                 </div>
-                <button
-                    onClick={fetchStats}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all active:scale-95"
-                >
-                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                    Refresh Stats
-                </button>
+
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={toggleBots}
+                        className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all active:scale-95 ${botsPaused
+                                ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                            }`}
+                    >
+                        <div className={`w-2 h-2 rounded-full ${botsPaused ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                        {botsPaused ? 'BOTS PAUSED' : 'BOTS ACTIVE'}
+                    </button>
+
+                    <button
+                        onClick={fetchStats}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg hover:bg-slate-700 transition-all active:scale-95"
+                    >
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                        Refresh Stats
+                    </button>
+                </div>
             </div>
 
             <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 pb-12">
