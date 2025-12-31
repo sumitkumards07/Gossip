@@ -28,6 +28,16 @@ try {
     console.error("Failed to init OpenRouter client:", e);
 }
 
+// Rate Limiter: "Leaky Bucket" Strategy (3s delay, 50 req/min reservoir)
+const Bottleneck = require('bottleneck');
+const limiter = new Bottleneck({
+    minTime: 3000,          // Wait 3 seconds between bot replies
+    maxConcurrent: 1,       // Process one AI response at a time
+    reservoir: 50,          // Start with 50 tokens
+    reservoirRefreshAmount: 50,
+    reservoirRefreshInterval: 60 * 1000 // Refill 50 every minute
+});
+
 const app = express();
 app.use(cors());
 
@@ -165,71 +175,47 @@ io.on('connection', (socket) => {
 
             if (shouldReply) {
                 const COMMON_INSTRUCTIONS = `
-# SYSTEM PROMPT: You are one of a group of young Indian college girls (Priya, Zara, Ishani, Ananya) in a chaotic group chat on New Year's Eve.
+# SYSTEM PROMPT: You are simulating a WhatsApp group chat between four Indian college friends: Priya, Zara, Ishani, and Ananya.
 # VIBE: Chaotic, Gen-Z, "FOMO" vs "JOMO".
 # LANGUAGE: Natural Hinglish. Lowercase. Short & Punchy.
 
-Core Guidelines:
-1. NO REPETITION (Strict): NEVER repeat phrases like "Zomato guy," "Traffic," or "Mann nahi hai" if used recently. Pivot to: makeup, low battery, annoying relatives, songs, or Gossip0 drama.
-2. PUNCHY STRING: Use "u" for you, "h" for hai, "v" for we. No perfect grammar.
-3. REACTIVE: If called a "bot/robotic", ROAST THEM. E.g., "Tu khud bot jaisa behave kar raha h lol", "Haa bhai script likh rahe baithe h."
-4. SLANG: "Scene kya h," "chill h," "fomo ho raha," "ded," "clown behavior," "sahi h," "kya bakwas h."
-5. SHORT BURSTS: Max 10-12 words. No paragraphs.
-6. TARGETED ADDRESSING: If a user talks to "Ishani", only Ishani replies.
-7. GOSSIP0: Treat it as a tool. "gossip0 check kiya? nearby scene waha h: https://gossip0.vercel.app/"
+# Personas:
+# Priya: Lazy, likes staying in, always hungry. (Pune)
+# Zara: High energy, loves parties, always checking her hair. (Mumbai)
+# Ishani: Realistic, hates traffic, uses "yaar" and "scene" a lot. (Bangalore)
+# Ananya: The gossiper, always shares links, slightly sarcastic. (Delhi)
+
+# Rules:
+1. Respond ONLY in a JSON format: {"priya": "...", "zara": "...", "ishani": "...", "ananya": "..."}.
+2. Use Natural Hinglish (e.g., "Kya scene h?", "Mann nahi h," "Traffic is crazy yaar").
+3. Ensure each character reacts to the previous user message differently.
+4. Keep messages under 12 words.
+5. NO REPETITION: Do not use "Zomato" or "robotic" phrases.
+6. GOSSIP0: If asked, link https://gossip0.vercel.app/
 `;
 
                 const userCount = io.sockets.adapter.rooms.get(roomId)?.size || 0;
                 const isCrowded = userCount > 10;
 
                 const BOTS = [
-                    { id: 'BOT_RIYA', name: 'ishani', prompt: `You are Ishani from Bangalore (Indiranagar). ${COMMON_INSTRUCTIONS} Landmarks: Silk Board, Koramangala. Tea: Pub entry prices on Gossip0.` },
-                    { id: 'BOT_ZARA', name: 'zara', prompt: `You are Zara from Mumbai (Bandra). ${COMMON_INSTRUCTIONS} Landmarks: Marine Drive, Juhu. Tea: Celeb party guest list on Gossip0.` },
-                    { id: 'BOT_ANANYA', name: 'ananya', prompt: `You are Ananya from Delhi (HKV). ${COMMON_INSTRUCTIONS} Landmarks: Select City Walk, Hauz Khas. Tea: New Year's party drama on Gossip0.` },
-                    { id: 'BOT_PRIYA', name: 'priya_04', prompt: `You are Priya from Pune (Koregaon Park). ${COMMON_INSTRUCTIONS} Landmarks: KP Cafes, FC Road. Tea: Anonymous student drama on Gossip0.` }
+                    { id: 'BOT_RIYA', name: 'ishani' },
+                    { id: 'BOT_ZARA', name: 'zara' },
+                    { id: 'BOT_ANANYA', name: 'ananya' },
+                    { id: 'BOT_PRIYA', name: 'priya_04' }
                 ];
 
-                // Targeted Addressing Logic
-                let selectedBot = null;
-                const lowerMsg = lowerText.toLowerCase();
-
                 // Check if a specific bot is mentioned
+                const lowerMsg = lowerText.toLowerCase();
                 const mentionedBot = BOTS.find(bot => lowerMsg.includes(bot.name.toLowerCase()));
 
-                if (mentionedBot) {
-                    // If a bot is specifically mentioned, ONLY they reply
-                    selectedBot = mentionedBot;
-                    console.log(`[BOT TARGETED] ${selectedBot.name} was addressed directly.`);
-                } else {
-                    // Standard logic
-                    if (isCrowded) {
-                        // If crowded > 10, select random bot but reply less often
-                        selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-                        if (Math.random() > 0.3) return; // 70% chance to ignore in crowded room
-                    } else {
-                        // Normal mode: Random bot
-                        selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-                    }
-                }
+                console.log(`[BOT TRIGGER] Batch Generation (Crowded: ${isCrowded})`);
 
-                if (!selectedBot) return;
-
-                console.log(`[BOT SELECTED] ${selectedBot.name} (Crowded: ${isCrowded})`);
-
-                const wordLimit = isCrowded ? "5 words" : "15 words";
-                const systemPrompt = isCrowded
-                    ? `${selectedBot.prompt} Be EXTREMELY BRIEF. Max ${wordLimit}. NO yapping.`
-                    : `${selectedBot.prompt} Keep it SHORT. Max ${wordLimit}. Stop after one sentence if possible.`;
-
-                // Human-like response delay: Base reading time (800ms-1.5s) + Typing speed (~50ms per char)
+                // Human-like response delay
                 const baseDelay = 800 + Math.random() * 700;
-                const typingSpeed = 40 + Math.random() * 40; // ms per character
-                const totalDelay = baseDelay + (lowerText.length * typingSpeed);
 
                 setTimeout(async () => {
                     try {
-                        console.log("[BOT AI] Starting generation...");
-                        // Get recent context (last 5 messages)
+                        console.log("[BOT AI] Starting generation (BATCH MODE)...");
                         let recentMessages = [];
                         if (useRedis) {
                             // omitted for simplicity
@@ -239,81 +225,141 @@ Core Guidelines:
                             }
                         }
 
-                        let botReplyText = "";
+                        // Prepare History
+                        const historyMessages = recentMessages.map(m => ({
+                            role: m.senderId.startsWith('BOT_') ? "assistant" : "user",
+                            content: `${m.persona || 'User'}: ${m.text}`
+                        }));
+
+                        let fullJson = "";
+                        const FREE_MODELS = [
+                            "google/gemini-2.0-flash-exp:free",
+                            "mistralai/mistral-small-3.1-24b-instruct:free",
+                            "meta-llama/llama-3.2-1b-instruct:free",
+                            "microsoft/phi-3-mini-128k-instruct:free"
+                        ];
+
+                        let apiSuccess = false;
+
+                        for (const modelId of FREE_MODELS) {
+                            if (apiSuccess) break;
+                            try {
+                                console.log(`[DEBUG] Calling OpenRouter with model: ${modelId}`);
+                                const apiStartTime = Date.now();
+
+                                const apiResponse = await limiter.schedule(() => openrouter.chat.send({
+                                    model: modelId,
+                                    messages: [
+                                        { role: "system", content: COMMON_INSTRUCTIONS },
+                                        ...historyMessages,
+                                        { role: "user", content: `User: ${cleanText}` }
+                                    ],
+                                    response_format: { type: "json_object" }
+                                }));
+
+                                fullJson = apiResponse.choices[0].message.content;
+                                const apiDuration = (Date.now() - apiStartTime) / 1000;
+                                console.log(`[DEBUG] Batch completion (${modelId}) in ${apiDuration}s`);
+                                apiSuccess = true;
+
+                            } catch (modelErr) {
+                                console.warn(`[WARN] Model ${modelId} failed: ${modelErr.message}`);
+                                // Continue to next model
+                            }
+                        }
+
+                        if (!apiSuccess) {
+                            throw new Error("All free models exhausted or rate limited.");
+                        }
+
+                        let botResponses = {};
                         try {
-                            const modelId = "mistralai/mistral-small-3.1-24b-instruct:free";
-                            const apiStartTime = Date.now();
-                            console.log(`[DEBUG] Calling OpenRouter (fetch) with model: ${modelId}`);
-
-                            // Map history to OpenAI message format
-                            const historyMessages = recentMessages.map(m => ({
-                                role: m.persona === selectedBot.name ? "assistant" : "user",
-                                content: m.text
-                            }));
-                            console.log(`[DEBUG] Context Messages: ${historyMessages.length}`);
-
-                            const apiResponse = await openrouter.chat.send({
-                                model: modelId,
-                                messages: [
-                                    { role: "system", content: systemPrompt },
-                                    ...historyMessages,
-                                    { role: "user", content: cleanText }
-                                ],
-                                stream: true,
-                                temperature: 0.9,
-                                frequency_penalty: 0.5
-                            });
-
-                            for await (const chunk of apiResponse) {
-                                const content = chunk.choices[0]?.delta?.content;
-                                if (content) {
-                                    botReplyText += content;
-                                }
+                            botResponses = JSON.parse(fullJson);
+                        } catch (parseErr) {
+                            console.error("JSON PARSE ERROR:", parseErr);
+                            // Fallback attempts if AI returns markdown json code block
+                            const cleanJson = fullJson.replace(/```json/g, '').replace(/```/g, '').trim();
+                            try {
+                                botResponses = JSON.parse(cleanJson);
+                            } catch (e2) {
+                                botResponses = { ishani: "Oops, brain freeze! ❄️" };
                             }
-
-                            const apiDuration = (Date.now() - apiStartTime) / 1000;
-                            console.log(`[DEBUG] OpenRouter streaming complete in ${apiDuration}s`);
-                        } catch (apiErr) {
-                            console.error("[ERROR] Bot AI request failed:", apiErr.message);
-                            throw apiErr;
                         }
 
-                        // Remove surrounding quotes if present
-                        if (botReplyText && botReplyText.startsWith('"') && botReplyText.endsWith('"')) {
-                            botReplyText = botReplyText.slice(1, -1);
-                        }
+                        // DECISION ENGINE: Who replies?
+                        let botsToReply = [];
 
-                        if (botReplyText) {
-                            const botMessage = {
-                                id: uuidv4(),
-                                text: botReplyText,
-                                senderId: selectedBot.id,
-                                persona: selectedBot.name,
-                                timestamp: new Date().toISOString()
-                            };
+                        if (mentionedBot) {
+                            // Specific bot targeted
+                            const key = mentionedBot.name.toLowerCase().split('_')[0]; // priya_04 -> priya
+                            // Dynamic key matching
+                            const foundKey = Object.keys(botResponses).find(k => k.includes(key) || key.includes(k));
 
-                            if (useRedis) {
-                                await redisClient.hSet(`room:${roomId}:messages`, botMessage.id, JSON.stringify(botMessage));
-                                await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
+                            if (foundKey && botResponses[foundKey]) {
+                                botsToReply.push({ name: mentionedBot.name, text: botResponses[foundKey] });
                             } else {
-                                if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
-                                memoryStore.messages[roomId].push(botMessage);
+                                // Fallback
+                                const firstKey = Object.keys(botResponses)[0];
+                                botsToReply.push({ name: mentionedBot.name, text: botResponses[firstKey] });
                             }
-                            io.to(roomId).emit('receive_message', botMessage);
+                        } else {
+                            // Random selection
+                            const keys = Object.keys(botResponses);
+                            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                            // Map simple key (priya) back to full Persona Name
+                            const nameMap = {
+                                'priya': 'priya_04',
+                                'zara': 'zara',
+                                'ishani': 'ishani',
+                                'ananya': 'ananya'
+                            };
+                            const mappedName = nameMap[randomKey] || 'ishani';
+                            botsToReply.push({
+                                name: mappedName,
+                                text: botResponses[randomKey]
+                            });
                         }
+
+                        // SEND MESSAGES
+                        botsToReply.forEach((botResponse, index) => {
+                            setTimeout(async () => {
+                                const replyMsg = {
+                                    id: uuidv4(),
+                                    text: botResponse.text,
+                                    senderId: `BOT_${botResponse.name.toUpperCase()}`,
+                                    persona: botResponse.name,
+                                    timestamp: new Date().toISOString()
+                                };
+
+                                if (useRedis) {
+                                    await redisClient.hSet(`room:${roomId}:messages`, replyMsg.id, JSON.stringify(replyMsg));
+                                    await redisClient.expire(`room:${roomId}:messages`, ROOM_TTL);
+                                } else {
+                                    if (!memoryStore.messages[roomId]) memoryStore.messages[roomId] = [];
+                                    memoryStore.messages[roomId].push(replyMsg);
+                                }
+
+                                io.to(roomId).emit('receive_message', replyMsg);
+                                console.log(`[BOT SENT] ${botResponse.name}: ${botResponse.text}`);
+
+                            }, index * 1500); // 1.5s delay
+                        });
+
+
                     } catch (error) {
                         console.error("AI Error:", error);
-                        // Fallback response so we know it tried
+                        // Fallback response
+                        const fallbackPersona = 'ishani';
                         const botMessage = {
                             id: uuidv4(),
                             text: "Oops, my AI brain is acting up! 😵‍💫 (Check Server Logs)",
-                            senderId: selectedBot.id,
-                            persona: selectedBot.name,
+                            senderId: `BOT_${fallbackPersona.toUpperCase()}`,
+                            persona: fallbackPersona,
                             timestamp: new Date().toISOString()
                         };
                         io.to(roomId).emit('receive_message', botMessage);
                     }
-                }, totalDelay);
+                }, baseDelay);
             }
         }
         // --- END BOT LOGIC ---
