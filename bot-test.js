@@ -19,13 +19,13 @@ socket.on("connect", () => {
             // Join room
             socket.emit("join_room", response.room.id);
 
-            // Send message to trigger bot
-            console.log("Sending: 'hi'");
-            socket.emit("send_message", {
+            // Send a message targeting a specific bot
+            const testMessage = "ishani";
+            console.log(`Sending: '${testMessage}'`);
+            socket.emit('send_message', {
                 roomId: response.room.id,
-                text: "hi",
-                senderId: "tester",
-                persona: "Tester"
+                text: testMessage,
+                senderId: 'Tester'
             });
         } else {
             console.error("Failed to create room");

@@ -187,7 +187,7 @@ Gossip0 Strategy:
 `;
 
                 const userCount = io.sockets.adapter.rooms.get(roomId)?.size || 0;
-                const isCrowded = userCount > 4;
+                const isCrowded = userCount > 10;
 
                 const BOTS = [
                     { id: 'BOT_RIYA', name: 'ishani', prompt: `You are Ishani from Bangalore (Indiranagar). ${COMMON_INSTRUCTIONS} Landmarks: Silk Board, Koramangala. Tea: Pub entry prices on Gossip0.` },
@@ -196,20 +196,37 @@ Gossip0 Strategy:
                     { id: 'BOT_PRIYA', name: 'priya_04', prompt: `You are Priya from Pune (Koregaon Park). ${COMMON_INSTRUCTIONS} Landmarks: KP Cafes, FC Road. Tea: Anonymous student drama on Gossip0.` }
                 ];
 
-                // If crowded (> 4 users): only 1 bot (Riya) and very short responses
-                const selectedBot = isCrowded ? BOTS[0] : BOTS[Math.floor(Math.random() * BOTS.length)];
+                // Targeted Addressing Logic
+                let selectedBot = null;
+                const lowerMsg = lowerText.toLowerCase();
 
-                // Probability of reply: 100% if not crowded, 30% if crowded to avoid spam
-                const finalShouldReply = isCrowded ? (Math.random() < 0.3) : true;
+                // Check if a specific bot is mentioned
+                const mentionedBot = BOTS.find(bot => lowerMsg.includes(bot.name.toLowerCase()));
 
-                if (!finalShouldReply) return;
+                if (mentionedBot) {
+                    // If a bot is specifically mentioned, ONLY they reply
+                    selectedBot = mentionedBot;
+                    console.log(`[BOT TARGETED] ${selectedBot.name} was addressed directly.`);
+                } else {
+                    // Standard logic
+                    if (isCrowded) {
+                        // If crowded > 10, select random bot but reply less often
+                        selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
+                        if (Math.random() > 0.3) return; // 70% chance to ignore in crowded room
+                    } else {
+                        // Normal mode: Random bot
+                        selectedBot = BOTS[Math.floor(Math.random() * BOTS.length)];
+                    }
+                }
+
+                if (!selectedBot) return;
 
                 console.log(`[BOT SELECTED] ${selectedBot.name} (Crowded: ${isCrowded})`);
 
-                const wordLimit = isCrowded ? "5 words" : "10 words";
+                const wordLimit = isCrowded ? "5 words" : "15 words";
                 const systemPrompt = isCrowded
-                    ? `${selectedBot.prompt} Be EXTREMELY BRIEF. Max ${wordLimit}.`
-                    : selectedBot.prompt;
+                    ? `${selectedBot.prompt} Be EXTREMELY BRIEF. Max ${wordLimit}. NO yapping.`
+                    : `${selectedBot.prompt} Keep it SHORT. Max ${wordLimit}. Stop after one sentence if possible.`;
 
                 // Human-like response delay: Base reading time (800ms-1.5s) + Typing speed (~50ms per char)
                 const baseDelay = 800 + Math.random() * 700;
