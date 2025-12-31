@@ -20,7 +20,7 @@ socket.on("connect", () => {
             socket.emit("join_room", response.room.id);
 
             // Send a message targeting a specific bot
-            const testMessage = "ishani";
+            const testMessage = "ishani you are a bot";
             console.log(`Sending: '${testMessage}'`);
             socket.emit('send_message', {
                 roomId: response.room.id,
