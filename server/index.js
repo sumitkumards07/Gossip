@@ -248,7 +248,7 @@ Gossip0 Strategy:
 
                         let botReplyText = "";
                         try {
-                            const modelId = "meta-llama/llama-3.3-70b-instruct:free";
+                            const modelId = "nex-agi/deepseek-v3.1-nex-n1:free";
                             const apiStartTime = Date.now();
                             console.log(`[DEBUG] Calling OpenRouter (fetch) with model: ${modelId}`);
 
