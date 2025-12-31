@@ -259,35 +259,25 @@ Gossip0 Strategy:
                             }));
                             console.log(`[DEBUG] Context Messages: ${historyMessages.length}`);
 
-                            const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                                method: "POST",
-                                headers: {
-                                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                                    "HTTP-Referer": "https://github.com/sumitkumards07/Gossip",
-                                    "X-Title": "Gossip App",
-                                    "Content-Type": "application/json"
-                                },
-                                body: JSON.stringify({
-                                    model: modelId,
-                                    messages: [
-                                        { role: "system", content: systemPrompt },
-                                        ...historyMessages,
-                                        { role: "user", content: cleanText }
-                                    ]
-                                })
+                            const apiResponse = await openrouter.chat.send({
+                                model: modelId,
+                                messages: [
+                                    { role: "system", content: systemPrompt },
+                                    ...historyMessages,
+                                    { role: "user", content: cleanText }
+                                ],
+                                stream: true
                             });
 
-                            const data = await apiResponse.json();
-                            const apiDuration = (Date.now() - apiStartTime) / 1000;
-
-                            if (!apiResponse.ok) {
-                                console.error(`[ERROR] OpenRouter API Status: ${apiResponse.status} (Took ${apiDuration}s)`);
-                                console.error("[ERROR] OpenRouter API Error Payload:", JSON.stringify(data));
-                                throw new Error(data.error?.message || `API error ${apiResponse.status}`);
+                            for await (const chunk of apiResponse) {
+                                const content = chunk.choices[0]?.delta?.content;
+                                if (content) {
+                                    botReplyText += content;
+                                }
                             }
 
-                            console.log(`[DEBUG] OpenRouter response received in ${apiDuration}s`);
-                            botReplyText = data.choices?.[0]?.message?.content?.trim();
+                            const apiDuration = (Date.now() - apiStartTime) / 1000;
+                            console.log(`[DEBUG] OpenRouter streaming complete in ${apiDuration}s`);
                         } catch (apiErr) {
                             console.error("[ERROR] Bot AI request failed:", apiErr.message);
                             throw apiErr;
